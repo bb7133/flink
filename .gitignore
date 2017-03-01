@@ -10,6 +10,9 @@
 **/log/
 **/target/
 
+# jython
+**/*$py.class
+
 **/.version.properties
 build-target
 flink-connectors/flink-avro/src/test/java/org/apache/flink/api/io/avro/generated/

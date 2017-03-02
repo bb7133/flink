@@ -15,25 +15,30 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import sys
 from os.path import dirname, join, basename
 from glob import glob
-import sys
+import exclude
 from org.apache.flink.runtime.client import JobExecutionException
 
 tests = []
 pwd = dirname(sys.argv[0])
 
+if exclude.test_module_names:
+    print("Excluded tests: {}\n".format(exclude.test_module_names))
+
 for x in glob(join(pwd, 'test_*.py')):
     if not x.startswith('__'):
         test_module_name = basename(x)[:-3]
-        tests.append(__import__(test_module_name, globals(), locals()))
+        if test_module_name not in exclude.test_module_names:
+            tests.append(__import__(test_module_name, globals(), locals()))
 
 failed_tests = []
 for test in tests:
-    print("Submitting job ... {}".format(test.__name__))
+    print("Submitting job ... '{}'".format(test.__name__))
     try:
         test.Main().run()
-        print("Job completed ({})\n".format(test.__name__))
+        print("Job completed ('{}')\n".format(test.__name__))
     except JobExecutionException as ex:
         failed_tests.append(test.__name__)
         print("\n{}\n{}\n{}\n".format('#'*len(ex.message), ex.message, '#'*len(ex.message)))

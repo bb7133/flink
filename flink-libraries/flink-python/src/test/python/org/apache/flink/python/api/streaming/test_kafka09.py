@@ -18,8 +18,9 @@
 import sys
 import threading
 
-from org.apache.flink.python.api.jython.connectors import PythonFlinkKafkaProducer09, PythonFlinkKafkaConsumer09
+from utils import utils
 from utils import constants
+from org.apache.flink.python.api.jython.connectors import PythonFlinkKafkaProducer09, PythonFlinkKafkaConsumer09
 from org.apache.flink.api.java.utils import ParameterTool
 from utils.python_test_base import TestBase
 from org.apache.flink.api.common.functions import FlatMapFunction, ReduceFunction
@@ -134,6 +135,11 @@ class Main(TestBase):
         super(Main, self).__init__()
 
     def run(self):
+        host, port = KAFKA_DEFAULT_BOOTSTRAP_SERVERS.split(":")
+        if not utils.is_reachable(host, int(port)):
+            print("Kafka server is not reachable: [{}]".format(KAFKA_DEFAULT_BOOTSTRAP_SERVERS))
+            return
+
         kafka_p = KafkaStringProducer(KAFKA_DEFAULT_BOOTSTRAP_SERVERS, "Hello World", "quit", constants.NUM_ITERATIONS_IN_TEST)
         kafka_c = KafkaStringConsumer(KAFKA_DEFAULT_BOOTSTRAP_SERVERS)
 

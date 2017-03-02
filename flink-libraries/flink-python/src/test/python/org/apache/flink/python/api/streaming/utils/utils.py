@@ -34,3 +34,14 @@ def gen_free_port(port=5000, granularity=1):
                     raise Exception("free port not found.")
     finally:
         s.close()
+
+
+def is_reachable(host, port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((host, port))
+        return True
+    except socket.error as e:
+        return False
+    finally:
+        s.close()

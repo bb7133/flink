@@ -36,7 +36,7 @@ public class PythonStreamBinderTest extends StreamingProgramTestBase {
 
 	public static void main(String[] args) throws Exception {
 		File script = getPythonScriptPath(args);
-		if (isFirstArgAnOption(args)) {
+		if (args.length == 0 || isFirstArgAnOption(args)) {
 			args = prepend(args, script.getAbsolutePath());  // First argument in sys.argv is the script full path
 		}
 		PythonStreamBinder.main(args);

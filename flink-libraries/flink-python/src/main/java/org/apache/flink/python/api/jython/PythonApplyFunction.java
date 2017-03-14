@@ -17,6 +17,8 @@
  */
 package org.apache.flink.python.api.jython;
 
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.functions.windowing.RichWindowFunction;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.util.Collector;
@@ -24,7 +26,7 @@ import org.python.core.PyObject;
 
 import java.io.IOException;
 
-public class PythonApplyFunction implements WindowFunction<PyObject, PyObject, PyKey, Window> {
+public class PythonApplyFunction extends RichWindowFunction<PyObject, PyObject, PyKey, Window> {
 	private static final long serialVersionUID = 577032239468987781L;
 
 	private final byte[] serFun;
@@ -33,6 +35,24 @@ public class PythonApplyFunction implements WindowFunction<PyObject, PyObject, P
 
 	public PythonApplyFunction(WindowFunction<PyObject, Object, Object, Window> fun) throws IOException {
 		this.serFun = SerializationUtils.serializeObject(fun);
+	}
+
+	@Override
+	public void open(Configuration parameters) throws Exception {
+		this.fun = (WindowFunction<PyObject, Object, Object, Window>) UtilityFunctions.smartFunctionDeserialization(
+			getRuntimeContext(), this.serFun);
+		if (this.fun instanceof RichWindowFunction) {
+			final RichWindowFunction winFun = (RichWindowFunction)this.fun;
+			winFun.setRuntimeContext(getRuntimeContext());
+			winFun.open(parameters);
+		}
+	}
+
+	@Override
+	public void close() throws Exception {
+		if (this.fun instanceof RichWindowFunction) {
+			((RichWindowFunction)this.fun).close();
+		}
 	}
 
 	@Override

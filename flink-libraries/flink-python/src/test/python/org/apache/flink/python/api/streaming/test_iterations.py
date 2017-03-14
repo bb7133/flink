@@ -56,7 +56,7 @@ class Main(TestBase):
 
         less_then_zero.print()
 
-        result = env.execute("MyJob")
+        result = env.execute("MyJob", True)
         print("Job completed, job_id={}".format(result.jobID))
 
 

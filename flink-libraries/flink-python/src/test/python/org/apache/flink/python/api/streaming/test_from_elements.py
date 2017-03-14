@@ -54,7 +54,7 @@ class Main(TestBase):
             .reduce(Sum()) \
             .print()
 
-        result = env.execute("MyJob")
+        result = env.execute("MyJob", True)
         print("Job completed, job_id={}".format(result.jobID))
 
 

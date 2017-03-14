@@ -16,13 +16,33 @@
  * limitations under the License.
  */
 package org.apache.flink.python.api.jython;
-import org.python.util.PythonInterpreter;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.flink.configuration.GlobalConfiguration;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
+import org.apache.flink.runtime.filecache.FileCache;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.Properties;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.io.IOException;
+
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Random;
+
 
 public class PythonStreamBinder {
+	private static final Random r = new Random();
+	public static final String FLINK_PYTHON_FILE_PATH = System.getProperty("java.io.tmpdir") + File.separator + "flink_streaming_plan";
+
 
 	private PythonStreamBinder() {
 	}
@@ -34,9 +54,14 @@ public class PythonStreamBinder {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
+		PythonStreamBinder binder = new PythonStreamBinder();
+		binder.runPlan(args);
+	}
+
+	private void runPlan(String[] args) throws Exception {
 		File script;
 		if (args.length < 1) {
-			System.out.println("Usage: prog <pathToScript> [parameter1]..[parameterX]");
+			System.out.println("Usage: prog <pathToScript> [<pathToPackage1> .. [<pathToPackageX]] - [parameter1]..[parameterX]");
 			return;
 		}
 		else {
@@ -45,15 +70,122 @@ public class PythonStreamBinder {
 			{
 				throw new FileNotFoundException("Could not find file: " + args[0]);
 			}
+		}
 
+		int split = 0;
+		for (int x = 0; x < args.length; x++) {
+			if (args[x].compareTo("-") == 0) {
+				split = x;
+			}
 		}
-		Properties props = System.getProperties();
-		props.put("python.path", script.getParent());
-		PythonInterpreter.initialize(props, props, args);
-		try (PythonInterpreter interpreter = new PythonInterpreter()) {
-			interpreter.setErr(System.err);
-			interpreter.setOut(System.out);
-			interpreter.execfile(script.getAbsolutePath());
+
+		GlobalConfiguration.loadConfiguration();
+
+		String tmpPath = FLINK_PYTHON_FILE_PATH + r.nextInt();
+		prepareFiles(tmpPath, Arrays.copyOfRange(args, 0, split == 0 ? args.length : split));
+
+		if (split != 0) {
+			String[] a = new String[args.length - split];
+			a[0] = args[0];
+			System.arraycopy(args, split + 1, a, 1, args.length - (split +1));
+			args = a;
+		} else if (args.length > 1) {
+			args = new String[]{args[0]};
 		}
+
+		UtilityFunctions.initAndExecPythonScript(new File(
+			tmpPath + File.separator + PythonEnvironmentConfig.FLINK_PYTHON_PLAN_NAME));
+	}
+
+	/**
+	 * Copies all files to a common directory (FLINK_PYTHON_FILE_PATH). This allows us to distribute it as one big
+	 * package, and resolves PYTHONPATH issues.
+	 *
+	 * @param filePaths
+	 * @throws IOException
+	 * @throws URISyntaxException
+	 */
+	private void prepareFiles(String tempFilePath, String... filePaths) throws IOException, URISyntaxException,
+		NoSuchAlgorithmException {
+		PythonEnvironmentConfig.pythonTmpCachePath = tempFilePath;
+
+		FileCache.clearPath(tempFilePath);
+		Files.createDirectories(Paths.get(tempFilePath));
+
+		String dstMainScriptFullPath = tempFilePath + File.separator + FilenameUtils.getBaseName(filePaths[0]) +
+			calcPythonMd5(filePaths[0]) + ".py";
+
+		generateAndCopyPlanFile(tempFilePath, dstMainScriptFullPath);
+
+		//main script
+		copyFile(filePaths[0], tempFilePath, FilenameUtils.getName(dstMainScriptFullPath));
+
+		String parentDir = new File(filePaths[0]).getParent();
+
+		//additional files/folders(modules)
+		for (int x = 1; x < filePaths.length; x++) {
+			String currentParent = (new File(filePaths[x])).getParent();
+			if (currentParent.startsWith(".")) {
+				filePaths[x] = parentDir + File.separator + filePaths[x];
+			}
+			copyFile(filePaths[x], tempFilePath, null);
+		}
+	}
+
+	private void generateAndCopyPlanFile(String dstPath, String mainScriptFullPath) throws IOException {
+		String moduleName = FilenameUtils.getBaseName(mainScriptFullPath);
+
+		FileWriter fileWriter = new FileWriter(dstPath + File.separator + PythonEnvironmentConfig.FLINK_PYTHON_PLAN_NAME);
+		PrintWriter printWriter = new PrintWriter(fileWriter);
+		printWriter.printf("import %s\n\n", moduleName);
+		printWriter.printf("%s.Main().run()\n", moduleName);
+		printWriter.close();
+	}
+
+	private void copyFile(String path, String target, String name) throws IOException, URISyntaxException {
+		if (path.endsWith(File.separator)) {
+			path = path.substring(0, path.length() - 1);
+		}
+		String identifier = name == null ? path.substring(path.lastIndexOf(File.separator)) : name;
+		String tmpFilePath = target + File.separator + identifier;
+		FileCache.clearPath(tmpFilePath);
+		Path p = new Path(path);
+		FileCache.copy(p.makeQualified(FileSystem.get(p.toUri())), new Path(tmpFilePath), true);
+	}
+
+
+	/**
+	 * Naive MD5 calculation from the python content of the given script. Spaces, blank lines and comment
+	 * are ignored.
+	 *
+	 * @param filePath  the full path of the given python script
+	 * @return  the md5 value as a string
+	 * @throws NoSuchAlgorithmException
+	 * @throws IOException
+	 */
+	private String calcPythonMd5(String filePath) throws NoSuchAlgorithmException, IOException {
+		FileReader fileReader = new FileReader(filePath);
+		BufferedReader bufferedReader = new BufferedReader(fileReader);
+
+		String line;
+		MessageDigest md = MessageDigest.getInstance("MD5");
+		while ((line = bufferedReader.readLine()) != null) {
+			line = line.trim();
+			if (line.isEmpty() || line.startsWith("#")) {
+				continue;
+			}
+			byte[] bytes = line.getBytes();
+			md.update(bytes, 0, bytes.length);
+		}
+		fileReader.close();
+
+		byte[] mdBytes = md.digest();
+
+		//convert the byte to hex format method 1
+		StringBuffer sb = new StringBuffer();
+		for (int i = 0; i < mdBytes.length; i++) {
+			sb.append(Integer.toString((mdBytes[i] & 0xff) + 0x100, 16).substring(1));
+		}
+		return sb.toString();
 	}
 }

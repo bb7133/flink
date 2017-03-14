@@ -66,7 +66,7 @@ class Main(TestBase):
                 .reduce(Sum()) \
                 .print()
 
-            env.execute()
+            env.execute(True)
         finally:
             tmp_f.close()
             os.unlink(tmp_f.name)

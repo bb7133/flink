@@ -15,39 +15,26 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-import sys
-from utils import constants
 from utils.python_test_base import TestBase
-from utils.pygeneratorbase import PyGeneratorBase
-from org.apache.flink.api.common.functions import FlatMapFunction, ReduceFunction
-from org.apache.flink.api.java.functions import KeySelector
-from org.apache.flink.streaming.api.windowing.time.Time import seconds
+from org.apache.flink.streaming.api.functions.source import SourceFunction
 
 
-class Generator(PyGeneratorBase):
-    def __init__(self, num_iters):
-        super(Generator, self).__init__(num_iters)
+class Generator(SourceFunction):
+    def __init__(self, num_iters=7000):
+        self._running = True
+        self._num_iters = num_iters
+
+    def run(self, ctx):
+        counter = 0
+        while self._running and counter < self._num_iters:
+            self.do(ctx)
+            counter += 1
+
+    def cancel(self):
+        self._running = False
 
     def do(self, ctx):
-        ctx.collect([222, 333])
-
-
-class Tokenizer(FlatMapFunction):
-    def flatMap(self, value, collector):
-        for v in value:
-            collector.collect((1, v))
-
-
-class Sum(ReduceFunction):
-    def reduce(self, input1, input2):
-        count1, val1 = input1
-        count2, val2 = input2
-        return (count1 + count2, val1)
-
-
-class Selector(KeySelector):
-    def getKey(self, input):
-        return input[1]
+        ctx.collect(777)
 
 
 class Main(TestBase):
@@ -56,16 +43,12 @@ class Main(TestBase):
 
     def run(self):
         env = self._get_execution_environment()
-        env.create_python_source(Generator(num_iters=constants.NUM_ITERATIONS_IN_TEST)) \
-            .flat_map(Tokenizer()) \
-            .key_by(Selector()) \
-            .time_window(seconds(1)) \
-            .reduce(Sum()) \
+        env.create_python_source(Generator(10)) \
             .print()
 
-        env.execute(True)
+        result = env.execute("MyJob", True)
+        print("Job completed, job_id={}".format(result.jobID))
 
 
 if __name__ == '__main__':
     Main().run()
-    print("Job completed ({})\n".format(sys.argv))

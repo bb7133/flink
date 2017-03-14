@@ -59,7 +59,7 @@ class Main(TestBase):
             .apply(WindowSum()) \
             .print()
 
-        env.execute()
+        env.execute(True)
 
 
 if __name__ == '__main__':

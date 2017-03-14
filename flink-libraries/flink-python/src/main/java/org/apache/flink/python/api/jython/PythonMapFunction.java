@@ -36,7 +36,8 @@ public class PythonMapFunction extends RichMapFunction<PyObject, PyObject> {
 
 	@Override
 	public void open(Configuration config) throws Exception {
-		this.fun = (MapFunction<PyObject, PyObject>) SerializationUtils.deserializeObject(serFun);
+		this.fun = (MapFunction<PyObject, PyObject>) UtilityFunctions.smartFunctionDeserialization(
+			getRuntimeContext(), serFun);
 		if (this.fun instanceof RichFunction) {
 			final RichMapFunction mapFun = (RichMapFunction)this.fun;
 			mapFun.setRuntimeContext(getRuntimeContext());

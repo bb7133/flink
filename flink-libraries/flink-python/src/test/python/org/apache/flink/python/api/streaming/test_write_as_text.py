@@ -55,7 +55,7 @@ class Main(TestBase):
             .reduce(Sum()) \
             .write_as_text("/tmp/flink_write_as_text", WriteMode.OVERWRITE)
 
-        result = env.execute("MyJob")
+        result = env.execute("MyJob", True)
         print("Job completed, job_id={}".format(result.jobID))
 
 

@@ -18,8 +18,12 @@
 package org.apache.flink.python.api.jython;
 
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.fs.Path;
+import org.apache.flink.runtime.filecache.FileCache;
 import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.python.core.PyObject;
@@ -30,7 +34,9 @@ import org.python.core.PyUnicode;
 import org.python.core.PyTuple;
 import org.python.core.PyObjectDerived;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Iterator;
 
@@ -131,7 +137,7 @@ public class PythonStreamExecutionEnvironment {
 	}
 
 	public PythonDataStream from_collection(Iterator<Object> iter) throws Exception  {
-		return new PythonDataStream(env.fromCollection(new PythonIteratorFunction(iter), Object.class)
+		return new PythonDataStream(env.addSource(new PythonIteratorFunction(iter), TypeExtractor.getForClass(Object.class))
 			.map(new UtilityFunctions.SerializerMap<>()));
 	}
 
@@ -163,26 +169,57 @@ public class PythonStreamExecutionEnvironment {
 	}
 
 	public JobExecutionResult execute() throws Exception {
+		return execute(false);
+	}
+
+	public JobExecutionResult execute(Boolean local) throws Exception {
+		if (PythonEnvironmentConfig.pythonTmpCachePath == null) {
+			// Nothing to be done! Is is executed on the task manager.
+			return new JobExecutionResult(null, 0, null);
+		}
+		distributeFiles(local);
+
 		return this.env.execute();
 	}
 
 	public JobExecutionResult execute(String job_name) throws Exception {
+		return execute(job_name, false)	;
+	}
+
+	public JobExecutionResult execute(String job_name, Boolean local) throws Exception {
+		if (PythonEnvironmentConfig.pythonTmpCachePath == null) {
+			// Nothing to be done! Is is executed on the task manager.
+			return new JobExecutionResult(null, 0, null);
+		}
+		distributeFiles(local);
+
 		return this.env.execute(job_name);
+	}
+
+	private void distributeFiles(boolean local) throws IOException, URISyntaxException
+	{
+		if (local || this.env instanceof LocalStreamEnvironment) {
+			PythonEnvironmentConfig.FLINK_HDFS_PATH =  System.getProperty("java.io.tmpdir") + File.separator + "flink";
+		}
+		FileCache.clearPath(PythonEnvironmentConfig.FLINK_HDFS_PATH);
+		FileCache.copy(new Path(PythonEnvironmentConfig.pythonTmpCachePath),
+			new Path(PythonEnvironmentConfig.FLINK_HDFS_PATH), true);
+		this.env.registerCachedFile(PythonEnvironmentConfig.FLINK_HDFS_PATH, PythonEnvironmentConfig.FLINK_PYTHON_DC_ID);
 	}
 
 	public static class TempSource implements SourceFunction<Object> {
 		private boolean running = true;
-		private Integer num_iters;
+		private Integer numIters;
 
-		public TempSource(Integer num_iters) {
-			this.num_iters = num_iters;
+		public TempSource(Integer numIters) {
+			this.numIters = numIters;
 		}
 
 		@Override
 		public void run(SourceContext<Object> ctx) throws Exception {
 			Integer counter = 0;
-			boolean run_forever = (num_iters == -1);
-			while (running && (run_forever || counter++ < this.num_iters)){
+			boolean run_forever = (numIters == -1);
+			while (running && (run_forever || counter++ < this.numIters)){
 				ctx.collect("World");
 			}
 		}

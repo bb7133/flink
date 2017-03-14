@@ -37,7 +37,8 @@ public class PythonFilterFunction extends RichFilterFunction<PyObject> {
 
 	@Override
 	public void open(Configuration parameters) throws Exception {
-		this.fun = (FilterFunction<PyObject>) SerializationUtils.deserializeObject(this.serFun);
+		this.fun = (FilterFunction<PyObject>) UtilityFunctions.smartFunctionDeserialization(
+			getRuntimeContext(), this.serFun);
 		if (this.fun instanceof RichFunction) {
 			final RichFilterFunction filterFun = (RichFilterFunction)this.fun;
 			filterFun.setRuntimeContext(getRuntimeContext());

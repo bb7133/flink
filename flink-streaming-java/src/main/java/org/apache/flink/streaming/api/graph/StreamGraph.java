@@ -91,7 +91,6 @@ public class StreamGraph extends StreamingPlan {
 	private AbstractStateBackend stateBackend;
 	private Set<Tuple2<StreamNode, StreamNode>> iterationSourceSinkPairs;
 
-
 	public StreamGraph(StreamExecutionEnvironment environment) {
 		this.environment = environment;
 		this.executionConfig = environment.getConfig();

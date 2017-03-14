@@ -126,7 +126,7 @@ class KafkaStringConsumer(threading.Thread, TestBase):
             .reduce(Sum()) \
             .print()
 
-        result = env.execute("Python consumer kafka09 test")
+        result = env.execute("Python consumer kafka09 test", True)
         print("Kafka09 consumer job completed, job_id={}".format(result.jobID))
 
 

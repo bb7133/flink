@@ -17,46 +17,41 @@
  */
 package org.apache.flink.python.api.jython;
 
-import java.io.Serializable;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
+
 import java.util.Iterator;
 import java.io.IOException;
 
-public class PythonIteratorFunction implements Iterator<Object>, Serializable {
+public class PythonIteratorFunction extends RichSourceFunction<Object> {
 	private static final long serialVersionUID = 6741748297048588334L;
 
 	private final byte[] serFun;
 	private transient Iterator<Object> fun;
+	private volatile boolean isRunning = true;
 
 	public PythonIteratorFunction(Iterator<Object> fun) throws IOException {
 		this.serFun = SerializationUtils.serializeObject(fun);
 	}
 
-	public boolean hasNext() {
-		if (this.fun == null) {
-			extractUserFunction();
-		}
-
-		return this.fun.hasNext();
+	@Override
+	public void open(Configuration parameters) throws Exception {
+		this.fun = (Iterator<Object>) UtilityFunctions.smartFunctionDeserialization(getRuntimeContext(), this.serFun);
 	}
 
-	public Object next(){
-		if (this.fun == null) {
-			extractUserFunction();
-		}
-
-		return UtilityFunctions.adapt(this.fun.next());
+	@Override
+	public void close() throws Exception {
 	}
 
-	public void remove() {
+	@Override
+	public void run(SourceContext<Object> ctx) throws Exception {
+		while (isRunning && this.fun.hasNext()) {
+			ctx.collect(this.fun.next());
+		}
 	}
 
-	private void extractUserFunction() {
-		try {
-			this.fun = (Iterator<Object>) SerializationUtils.deserializeObject(this.serFun);
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		}
+	@Override
+	public void cancel() {
+		isRunning = false;
 	}
 }

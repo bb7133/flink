@@ -64,7 +64,7 @@ class Main(TestBase):
             .reduce(Sum()) \
             .print()
 
-        result = env.execute("My python union stream test")
+        result = env.execute("My python union stream test", True)
         print("Job completed, job_id={}".format(result.jobID))
 
 

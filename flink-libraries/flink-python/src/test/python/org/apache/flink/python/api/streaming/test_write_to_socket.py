@@ -93,7 +93,7 @@ class Main(TestBase):
             .reduce(Sum()) \
             .write_to_socket('localhost', port, ToStringSchema())
 
-        result = env.execute("MyJob")
+        result = env.execute("MyJob", True)
         print("Job completed, job_id={}".format(result.jobID))
 
 if __name__ == '__main__':

@@ -59,7 +59,7 @@ class Main(TestBase):
             .reduce(Sum()) \
             .print()
 
-        env.execute()
+        env.execute(True)
 
 
 if __name__ == '__maine__':

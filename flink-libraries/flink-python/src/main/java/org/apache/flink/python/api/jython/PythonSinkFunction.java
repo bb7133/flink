@@ -38,7 +38,8 @@ public class PythonSinkFunction extends RichSinkFunction<PyObject> {
 
 	@Override
 	public void open(Configuration parameters) throws Exception {
-		this.fun = (SinkFunction<PyObject>) SerializationUtils.deserializeObject(this.serFun);
+		this.fun = (SinkFunction<PyObject>) UtilityFunctions.smartFunctionDeserialization(
+			getRuntimeContext(), this.serFun);
 		if (this.fun instanceof RichFunction) {
 			final RichSinkFunction sinkFunction = (RichSinkFunction)this.fun;
 			sinkFunction.setRuntimeContext(getRuntimeContext());

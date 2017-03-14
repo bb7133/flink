@@ -17,11 +17,25 @@
  */
 package org.apache.flink.python.api.jython;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.python.core.Py;
 import org.python.core.PyObject;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.python.core.PySystemState;
+import org.python.util.PythonInterpreter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Properties;
+
 
 public class UtilityFunctions {
+	private static boolean jythonInitialized = false;
+	private static PythonInterpreter pythonInterpreter;
+	private static final Logger LOG = LoggerFactory.getLogger(UtilityFunctions.class);
+
 	private UtilityFunctions() {
 	}
 
@@ -39,5 +53,46 @@ public class UtilityFunctions {
 			return (PyObject)o;
 		}
 		return  Py.java2py(o);
+	}
+
+	public static synchronized Object smartFunctionDeserialization(RuntimeContext runtimeCtx, byte[] serFun) throws IOException, ClassNotFoundException, InterruptedException {
+		try {
+			return SerializationUtils.deserializeObject(serFun);
+		} catch (Exception e) {
+			String path = runtimeCtx.getDistributedCache().getFile(PythonEnvironmentConfig.FLINK_PYTHON_DC_ID).getAbsolutePath();
+
+			initPythonInterpreter(path);
+
+			PySystemState pySysStat = Py.getSystemState();
+			pySysStat.path.add(0, path);
+
+			String scriptFullPath = path + File.separator + PythonEnvironmentConfig.FLINK_PYTHON_PLAN_NAME;
+			LOG.debug("Execute python script, path=" + scriptFullPath);
+			pythonInterpreter.execfile(scriptFullPath);
+
+			pySysStat.path.remove(path);
+
+			return SerializationUtils.deserializeObject(serFun);
+		}
+	}
+
+	public static void initAndExecPythonScript(File scriptFullPath) {
+		initPythonInterpreter(scriptFullPath.getParent());
+		pythonInterpreter.execfile(scriptFullPath.getAbsolutePath());
+	}
+
+	private static synchronized void initPythonInterpreter(String pythonPath) {
+		if (!jythonInitialized) {
+			LOG.debug("Init python interpreter, path=" + pythonPath);
+			Properties postProperties = new Properties();
+			postProperties.put("python.path", pythonPath);
+			PythonInterpreter.initialize(System.getProperties(), postProperties, new String[]{""});
+
+			pythonInterpreter = new PythonInterpreter();
+			pythonInterpreter.setErr(System.err);
+			pythonInterpreter.setOut(System.out);
+
+			jythonInitialized = true;
+		}
 	}
 }

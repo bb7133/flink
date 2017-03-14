@@ -36,8 +36,10 @@ public class PythonStreamBinderTest extends StreamingProgramTestBase {
 
 	public static void main(String[] args) throws Exception {
 		File script = getPythonScriptPath(args);
-		if (args.length == 0 || isFirstArgAnOption(args)) {
+		if (args.length == 0) {
 			args = prepend(args, script.getAbsolutePath());  // First argument in sys.argv is the script full path
+		} else {
+			args[0] = script.getPath();
 		}
 		PythonStreamBinder.main(args);
 	}
@@ -53,19 +55,7 @@ public class PythonStreamBinderTest extends StreamingProgramTestBase {
 	}
 
 	private static File getPythonScriptPath(String[] args) throws Exception {
-		File script;
-		if (args.length > 0) {
-			if (isFirstArgAnOption(args)) {
-				final ParameterTool params = ParameterTool.fromArgs(args);
-				String scriptResource = params.get("script", defaultPythonScriptName);
-				script = findStreamTestFile(scriptResource);
-			} else {
-				script = findStreamTestFile(args[0]);
-			}
-		} else {
-			script = findStreamTestFile(defaultPythonScriptName);
-		}
-		return script;
+		return findStreamTestFile(args.length > 0 ? args[0] : defaultPythonScriptName);
 	}
 
 	private static File findStreamTestFile(String name) throws Exception {

@@ -15,26 +15,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.flink.python.api.jython;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 
-public class SerializationUtils {
-	public static byte[] serializeObject(Object o) throws IOException {
-		try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); ObjectOutputStream oos = new ObjectOutputStream(baos)) {
-			oos.writeObject(o);
-			oos.flush();
-			return baos.toByteArray();
-		}
-	}
+/**
+ * Created by zohar on 08/03/2017.
+ */
+public class PythonEnvironmentConfig {
+	public static final String FLINK_PYTHON_DC_ID = "flink";
 
-	public static Object deserializeObject(byte[] bytes) throws IOException, ClassNotFoundException {
-		try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes); ObjectInputStream ois = new PythonObjectInputStream2(bais)) {
-			return ois.readObject();
-		}
-	}
+	public static final String FLINK_PYTHON_PLAN_NAME = "plan.py";
+
+	/**
+	 * Holds the path for the local python files cache. Is is set only on the client side by
+	 * the python streaming plan binder.
+	 */
+	public static String pythonTmpCachePath;
+
+	/**
+	 * Holds the path in the shared storage at which the python script(s) reside. It is set on the client side
+	 * within the execution process.
+	 */
+	public static String FLINK_HDFS_PATH = "hdfs:/tmp/flink"; // "file:/tmp/flink"
+
 }

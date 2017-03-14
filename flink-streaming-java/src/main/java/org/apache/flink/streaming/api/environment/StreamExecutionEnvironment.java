@@ -24,6 +24,8 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.Plan;
+import org.apache.flink.api.common.cache.DistributedCache;
 import org.apache.flink.api.common.functions.InvalidTypesException;
 import org.apache.flink.api.common.functions.StoppableFunction;
 import org.apache.flink.api.common.io.FileInputFormat;
@@ -36,6 +38,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.ClosureCleaner;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.io.TextInputFormat;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.MissingTypeInfo;
 import org.apache.flink.api.java.typeutils.PojoTypeInfo;
@@ -134,6 +137,8 @@ public abstract class StreamExecutionEnvironment {
 	/** The time characteristic used by the data streams */
 	private TimeCharacteristic timeCharacteristic = DEFAULT_TIME_CHARACTERISTIC;
 
+	protected final List<Tuple2<String, DistributedCache.DistributedCacheEntry>> cacheFile = new ArrayList<>();
+
 
 	// --------------------------------------------------------------------------------------------
 	// Constructor and Properties
@@ -145,6 +150,8 @@ public abstract class StreamExecutionEnvironment {
 	public ExecutionConfig getConfig() {
 		return config;
 	}
+
+	public List<Tuple2<String, DistributedCache.DistributedCacheEntry>> getCacheFile() { return cacheFile; }
 
 	/**
 	 * Sets the parallelism for operations executed through this environment.
@@ -1795,5 +1802,55 @@ public abstract class StreamExecutionEnvironment {
 	
 	protected static void resetContextEnvironment() {
 		contextEnvironmentFactory = null;
+	}
+
+	/**
+	 * Registers a file at the distributed cache under the given name. The file will be accessible
+	 * from any user-defined function in the (distributed) runtime under a local path. Files
+	 * may be local files (as long as all relevant workers have access to it), or files in a distributed file system.
+	 * The runtime will copy the files temporarily to a local cache, if needed.
+	 * <p>
+	 * The {@link org.apache.flink.api.common.functions.RuntimeContext} can be obtained inside UDFs via
+	 * {@link org.apache.flink.api.common.functions.RichFunction#getRuntimeContext()} and provides access
+	 * {@link org.apache.flink.api.common.cache.DistributedCache} via
+	 * {@link org.apache.flink.api.common.functions.RuntimeContext#getDistributedCache()}.
+	 *
+	 * @param filePath The path of the file, as a URI (e.g. "file:///some/path" or "hdfs://host:port/and/path")
+	 * @param name The name under which the file is registered.
+	 */
+	public void registerCachedFile(String filePath, String name){
+		registerCachedFile(filePath, name, false);
+	}
+
+	/**
+	 * Registers a file at the distributed cache under the given name. The file will be accessible
+	 * from any user-defined function in the (distributed) runtime under a local path. Files
+	 * may be local files (as long as all relevant workers have access to it), or files in a distributed file system.
+	 * The runtime will copy the files temporarily to a local cache, if needed.
+	 * <p>
+	 * The {@link org.apache.flink.api.common.functions.RuntimeContext} can be obtained inside UDFs via
+	 * {@link org.apache.flink.api.common.functions.RichFunction#getRuntimeContext()} and provides access
+	 * {@link org.apache.flink.api.common.cache.DistributedCache} via
+	 * {@link org.apache.flink.api.common.functions.RuntimeContext#getDistributedCache()}.
+	 *
+	 * @param filePath The path of the file, as a URI (e.g. "file:///some/path" or "hdfs://host:port/and/path")
+	 * @param name The name under which the file is registered.
+	 * @param executable flag indicating whether the file should be executable
+	 */
+	public void registerCachedFile(String filePath, String name, boolean executable){
+		this.cacheFile.add(new Tuple2<>(name, new DistributedCache.DistributedCacheEntry(filePath, executable)));
+	}
+
+	/**
+	 * Registers all files that were registered at this execution environment's cache registry of the
+	 * given plan's cache registry.
+	 *
+	 * @param p The plan to register files at.
+	 * @throws IOException Thrown if checks for existence and sanity fail.
+	 */
+	protected void registerCachedFilesWithPlan(Plan p) throws IOException {
+		for (Tuple2<String, DistributedCache.DistributedCacheEntry> entry : cacheFile) {
+			p.registerCachedFile(entry.f0, entry.f1);
+		}
 	}
 }

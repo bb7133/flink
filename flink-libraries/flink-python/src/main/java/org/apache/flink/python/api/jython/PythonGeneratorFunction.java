@@ -17,10 +17,13 @@
  */
 package org.apache.flink.python.api.jython;
 
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
+
 import java.io.IOException;
 
-public class PythonGeneratorFunction implements SourceFunction<Object> {
+public class PythonGeneratorFunction extends RichSourceFunction<Object> {
 	private static final long serialVersionUID = 3854587935845323082L;
 
 	private final byte[] serFun;
@@ -30,11 +33,16 @@ public class PythonGeneratorFunction implements SourceFunction<Object> {
 		this.serFun = SerializationUtils.serializeObject(fun);
 	}
 
-	public void run(SourceContext<Object> ctx) throws Exception {
-		if (this.fun == null) {
-			this.fun = (SourceFunction<Object> ) SerializationUtils.deserializeObject(this.serFun);
-		}
+	@Override
+	public void open(Configuration parameters) throws Exception {
+		this.fun = (SourceFunction<Object>) UtilityFunctions.smartFunctionDeserialization(
+			getRuntimeContext(), this.serFun);
+	}
 
+	@Override
+	public void close() throws Exception {}
+
+	public void run(SourceContext<Object> ctx) throws Exception {
 		this.fun.run(ctx);
 	}
 

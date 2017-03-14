@@ -39,7 +39,8 @@ public class PythonFlatMapFunction extends RichFlatMapFunction<PyObject, PyObjec
 
 	@Override
 	public void open(Configuration config) throws Exception {
-		this.fun = (FlatMapFunction<Object, Object>) SerializationUtils.deserializeObject(serFun);
+		this.fun = (FlatMapFunction<Object, Object>) UtilityFunctions.smartFunctionDeserialization(
+			getRuntimeContext(), serFun);
 		if (this.fun instanceof RichFunction) {
 			final RichFlatMapFunction flatMapFun = (RichFlatMapFunction)this.fun;
 			flatMapFun.setRuntimeContext(getRuntimeContext());

@@ -19,9 +19,6 @@
 package org.apache.flink.python.api.jython;
 
 
-/**
- * Created by zohar on 08/03/2017.
- */
 public class PythonEnvironmentConfig {
 	public static final String FLINK_PYTHON_DC_ID = "flink";
 

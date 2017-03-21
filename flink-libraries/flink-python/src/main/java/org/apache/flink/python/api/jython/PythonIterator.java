@@ -20,8 +20,5 @@ package org.apache.flink.python.api.jython;
 import java.io.Serializable;
 import java.util.Iterator;
 
-/**
- * Created by zohar on 09/02/2017.
- */
 public interface PythonIterator extends Iterator, Serializable {
 }

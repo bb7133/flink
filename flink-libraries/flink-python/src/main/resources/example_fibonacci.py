@@ -39,8 +39,8 @@ class Generator(SourceFunction):
             counter += 1
 
     def do(self, ctx):
-        tup = (random.randrange(1, MAX_INT_START), random.randrange(1, MAX_INT_START))
-        ctx.collect(tup)
+        two_numbers = "{}, {}".format(random.randrange(1, MAX_INT_START), random.randrange(1, MAX_INT_START))
+        ctx.collect(two_numbers)
 
     def cancel(self):
         self._running = False
@@ -53,7 +53,12 @@ class Fib(MapFunction):
 
 class InPut(MapFunction):
     def map(self, value):
-        return (value[0], value[1], value[0], value[1], 0)
+        num1, num2 = value.split(",")
+
+        num1 = int(num1.strip())
+        num2 = int(num2.strip())
+
+        return (num1, num2, num1, num2, 0)
 
 
 class OutPut(MapFunction):
@@ -70,9 +75,11 @@ class Main(object):
     def __init__(self):
         super(Main, self).__init__()
 
-    def run(self, argv):
+    def run(self):
+        argv = sys.argv[1:] if len(sys.argv) > 1 else []
         _params = ParameterTool.fromArgs(argv)
-        env = PythonStreamExecutionEnvironment.create_local_execution_environment(_params.getConfiguration())
+
+        env = PythonStreamExecutionEnvironment.get_execution_environment()
 
         # create input stream of integer pairs
         if "--input" in argv:
@@ -109,9 +116,9 @@ class Main(object):
                 parsed_output.print()
         else:
             parsed_output.print()
-        result = env.execute("Fibonacci Example (py)")
+        result = env.execute("Fibonacci Example (py)", True)
         print("Fibonacci job completed, job_id={}".format(result.jobID))
 
 
 if __name__ == '__main__':
-    Main().run(sys.argv[1:])
+    Main().run()

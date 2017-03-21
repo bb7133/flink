@@ -17,7 +17,6 @@
  */
 package org.apache.flink.python.api;
 
-import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
@@ -26,36 +25,44 @@ import org.apache.flink.python.api.jython.PythonStreamBinder;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ListIterator;
 
 public class PythonStreamBinderTest extends StreamingProgramTestBase {
 	final private static String defaultPythonScriptName = "run_all_tests.py";
-	final private static String pathToStreamingTests = "flink-libraries/flink-python/src/test/python/org/apache/flink/python/api/streaming";
+	final private static String flinkPythonRltvPath = "flink-libraries/flink-python";
+	final private static String pathToStreamingTests = "src/test/python/org/apache/flink/python/api/streaming";
 
 	public PythonStreamBinderTest() {
 	}
 
 	public static void main(String[] args) throws Exception {
-		File script = getPythonScriptPath(args);
 		if (args.length == 0) {
-			args = prepend(args, script.getAbsolutePath());  // First argument in sys.argv is the script full path
+			args = prepareDefaultArgs();
 		} else {
-			args[0] = script.getPath();
+			args[0] = findStreamTestFile(args[0]).getAbsolutePath();
 		}
 		PythonStreamBinder.main(args);
 	}
 
 	@Override
 	public void testProgram() throws Exception {
-		FileSystem fs = FileSystem.getLocalFileSystem();
-		String path_to_test = fs.getWorkingDirectory().getPath()
-								+ "/src/test/python/org/apache/flink/python/api/streaming/run_all_tests.py";
-		String[] args = {path_to_test};
-		this.main(args);
-
+		this.main(new String[]{});
 	}
 
-	private static File getPythonScriptPath(String[] args) throws Exception {
-		return findStreamTestFile(args.length > 0 ? args[0] : defaultPythonScriptName);
+	private static String[] prepareDefaultArgs() throws Exception {
+		File testFullPath = findStreamTestFile(defaultPythonScriptName);
+		List<String> filesInTestPath = getFilesInFolder(testFullPath.getParent());
+
+		String[] args = new String[filesInTestPath.size() + 1];
+		args[0] = testFullPath.getAbsolutePath();
+
+		for (final ListIterator<String> it = filesInTestPath.listIterator(); it.hasNext();) {
+			final String p = it.next();
+			args[it.previousIndex() + 1] = p;
+		}
+		return args;
 	}
 
 	private static File findStreamTestFile(String name) throws Exception {
@@ -63,9 +70,12 @@ public class PythonStreamBinderTest extends StreamingProgramTestBase {
 			return new File(name);
 		}
 		FileSystem fs = FileSystem.getLocalFileSystem();
+		String workingDir = fs.getWorkingDirectory().getPath();
+		if (!workingDir.endsWith(flinkPythonRltvPath)) {
+			workingDir += File.separator + flinkPythonRltvPath;
+		}
 		FileStatus[] status = fs.listStatus(
-			new Path(fs.getWorkingDirectory().toString()
-				+ File.separator + pathToStreamingTests));
+			new Path( workingDir + File.separator + pathToStreamingTests));
 		for (FileStatus f : status) {
 			String file_name = f.getPath().getName();
 			if (file_name.equals(name)) {
@@ -80,9 +90,24 @@ public class PythonStreamBinderTest extends StreamingProgramTestBase {
 	}
 
 	private static String[] prepend(String[] a, String prepended) {
-		String[] c = new String[a.length + 1];
+		String[] c = new String[a != null ? a.length + 1 : 1];
 		c[0] = prepended;
-		System.arraycopy(a, 0, c, 1, a.length);
+		if (a != null && a.length > 0) {
+			System.arraycopy(a, 0, c, 1, a.length);
+		}
 		return c;
+	}
+
+	private static List<String> getFilesInFolder(String path) {
+		List<String> results = new ArrayList<>();
+		File[] files = new File(path).listFiles();
+		if (files != null) {
+			for (File file : files) {
+				if (file.isDirectory() || file.getName().startsWith("test_")) {
+					results.add("." + File.separator + file.getName());
+				}
+			}
+		}
+		return results;
 	}
 }

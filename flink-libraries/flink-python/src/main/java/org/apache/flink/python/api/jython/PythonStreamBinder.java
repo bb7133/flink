@@ -94,7 +94,7 @@ public class PythonStreamBinder {
 		}
 
 		UtilityFunctions.initAndExecPythonScript(new File(
-			tmpPath + File.separator + PythonEnvironmentConfig.FLINK_PYTHON_PLAN_NAME));
+			tmpPath + File.separator + PythonEnvironmentConfig.FLINK_PYTHON_PLAN_NAME), args);
 	}
 
 	/**

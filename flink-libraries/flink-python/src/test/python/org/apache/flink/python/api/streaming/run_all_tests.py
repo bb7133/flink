@@ -18,40 +18,56 @@
 import sys
 from os.path import dirname, join, basename
 from glob import glob
-import exclude
 from org.apache.flink.runtime.client import JobExecutionException
 
-tests = []
-pwd = dirname(sys.argv[0])
 
-if exclude.test_module_names:
-    print("Excluded tests: {}\n".format(exclude.test_module_names))
-
-for x in glob(join(pwd, 'test_*.py')):
-    if not x.startswith('__'):
-        test_module_name = basename(x)[:-3]
-        if test_module_name not in exclude.test_module_names:
-            tests.append(__import__(test_module_name, globals(), locals()))
-
-failed_tests = []
-for test in tests:
-    print("Submitting job ... '{}'".format(test.__name__))
-    try:
-        test.Main().run()
-        print("Job completed ('{}')\n".format(test.__name__))
-    except JobExecutionException as ex:
-        failed_tests.append(test.__name__)
-        print("\n{}\n{}\n{}\n".format('#'*len(ex.message), ex.message, '#'*len(ex.message)))
-    except:
-        failed_tests.append(test.__name__)
-        ex_type = sys.exc_info()[0]
-        print("\n{}\n{}\n{}\n".format('#'*len(ex_type), ex_type, '#'*len(ex_type)))
+excluded_tests = [
+    'test_kafka09',
+]
 
 
-if failed_tests:
-    print("\nThe following tests were failed:")
-    for failed_test in failed_tests:
-        print("\t* " + failed_test)
-    raise Exception("\nFailed test(s): {}".format(failed_tests))
-else:
-    print("\n*** All tests passed successfully ***")
+class Main:
+    def __init__(self):
+        pass
+
+    def run(self):
+        tests = []
+        print("sys.argv: {}".format(sys.argv))
+        pwd = dirname(sys.argv[0])
+        print("Working directory: {}".format(pwd))
+
+        if excluded_tests:
+            print("Excluded tests: {}\n".format(excluded_tests))
+
+        for x in glob(join(pwd, 'test_*.py')):
+            if not x.startswith('__'):
+                test_module_name = basename(x)[:-3]
+                if test_module_name not in excluded_tests:
+                    tests.append(__import__(test_module_name, globals(), locals()))
+
+        failed_tests = []
+        for test in tests:
+            print("Submitting job ... '{}'".format(test.__name__))
+            try:
+                test.Main().run()
+                print("Job completed ('{}')\n".format(test.__name__))
+            except JobExecutionException as ex:
+                failed_tests.append(test.__name__)
+                print("\n{}\n{}\n{}\n".format('#'*len(ex.message), ex.message, '#'*len(ex.message)))
+            except:
+                failed_tests.append(test.__name__)
+                ex_type = sys.exc_info()[0]
+                print("\n{}\n{}\n{}\n".format('#'*len(ex_type), ex_type, '#'*len(ex_type)))
+
+        if failed_tests:
+            print("\nThe following tests were failed:")
+            for failed_test in failed_tests:
+                print("\t* " + failed_test)
+            raise Exception("\nFailed test(s): {}".format(failed_tests))
+        else:
+            print("\n*** All tests passed successfully ***")
+
+
+if __name__ == "__main__":
+    Main().run()
+

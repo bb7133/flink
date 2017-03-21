@@ -61,7 +61,7 @@ public class UtilityFunctions {
 		} catch (Exception e) {
 			String path = runtimeCtx.getDistributedCache().getFile(PythonEnvironmentConfig.FLINK_PYTHON_DC_ID).getAbsolutePath();
 
-			initPythonInterpreter(path);
+			initPythonInterpreter(path, new String[]{""});
 
 			PySystemState pySysStat = Py.getSystemState();
 			pySysStat.path.add(0, path);
@@ -76,17 +76,17 @@ public class UtilityFunctions {
 		}
 	}
 
-	public static void initAndExecPythonScript(File scriptFullPath) {
-		initPythonInterpreter(scriptFullPath.getParent());
+	public static void initAndExecPythonScript(File scriptFullPath, String[] args) {
+		initPythonInterpreter(scriptFullPath.getParent(), args);
 		pythonInterpreter.execfile(scriptFullPath.getAbsolutePath());
 	}
 
-	private static synchronized void initPythonInterpreter(String pythonPath) {
+	private static synchronized void initPythonInterpreter(String pythonPath, String[] args) {
 		if (!jythonInitialized) {
 			LOG.debug("Init python interpreter, path=" + pythonPath);
 			Properties postProperties = new Properties();
 			postProperties.put("python.path", pythonPath);
-			PythonInterpreter.initialize(System.getProperties(), postProperties, new String[]{""});
+			PythonInterpreter.initialize(System.getProperties(), postProperties, args);
 
 			pythonInterpreter = new PythonInterpreter();
 			pythonInterpreter.setErr(System.err);
